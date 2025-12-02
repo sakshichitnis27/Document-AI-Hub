@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document Management App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: light dark;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0b0c10;
+            color: #e8e9ec;
+        }
+
+        .app {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        nav {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        button, input[type="file"]::file-selector-button {
+            background: #2563eb;
+            border: none;
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 0.4rem;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        button.secondary {
+            background: #374151;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        th {
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+
+        .card {
+            background: #111827;
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 0.8rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .flex {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .flex-col {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        textarea,
+        input[type="text"] {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.6rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: #030712;
+            color: inherit;
+            font-size: 0.95rem;
+        }
+
+        .status {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: #a5b4fc;
+        }
+
+        .snippet {
+            font-size: 0.9rem;
+            color: #d1d5db;
+        }
+
+        @media (max-width: 768px) {
+            .app {
+                padding: 1rem;
+            }
+
+            .flex {
+                flex-direction: column;
+            }
+
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script>
+    const { useEffect, useState } = React;
+
+    const formatDate = (iso) => {
+        if (!iso) return '';
+        return new Date(iso).toLocaleString();
+    };
+
+    function DocumentsPage({ onView, onUpload, refreshKey }) {
+        const [documents, setDocuments] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState('');
+
+        useEffect(() => {
+            setLoading(true);
+            fetch('/api/documents')
+                .then((res) => res.json())
+                .then(setDocuments)
+                .catch(() => setError('Failed to load documents'))
+                .finally(() => setLoading(false));
+        }, [refreshKey]);
+
+        return (
+            React.createElement('div', null,
+                React.createElement('div', { className: 'card flex justify-between' },
+                    React.createElement('div', null,
+                        React.createElement('h2', null, 'Documents'),
+                        React.createElement('p', { style: { color: '#9ca3af', marginTop: '0.25rem' } },
+                            'Upload PDFs, extract text, summarize, and ask questions.')
+                    ),
+                    React.createElement('div', { className: 'flex', style: { alignItems: 'center' } },
+                        React.createElement('button', { onClick: onUpload }, 'Upload new')
+                    )
+                ),
+                loading && React.createElement('p', null, 'Loading documents...'),
+                error && React.createElement('p', { style: { color: '#f87171' } }, error),
+                (!loading && documents.length === 0) && React.createElement('p', null, 'No documents uploaded yet.'),
+                documents.length > 0 && React.createElement('table', null,
+                    React.createElement('thead', null,
+                        React.createElement('tr', null,
+                            React.createElement('th', null, 'Name'),
+                            React.createElement('th', null, 'Uploaded'),
+                            React.createElement('th', null, 'Status'),
+                            React.createElement('th', null, 'Actions')
+                        )
+                    ),
+                    React.createElement('tbody', null,
+                        documents.map(doc => React.createElement('tr', { key: doc.id },
+                            React.createElement('td', null, doc.originalFileName || 'Untitled'),
+                            React.createElement('td', null, formatDate(doc.uploadedAt)),
+                            React.createElement('td', null, doc.status),
+                            React.createElement('td', null,
+                                React.createElement('button', { onClick: () => onView(doc) }, 'View')
+                            )
+                        ))
+                    )
+                )
+            )
+        );
+    }
+
+    function UploadPage({ onDone }) {
+        const [file, setFile] = useState(null);
+        const [status, setStatus] = useState('');
+        const [busy, setBusy] = useState(false);
+
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            if (!file) {
+                setStatus('Please choose a PDF file first.');
+                return;
+            }
+            setBusy(true);
+            setStatus('Uploading file...');
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const uploadRes = await fetch('/api/documents', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!uploadRes.ok) {
+                    throw new Error('Upload failed');
+                }
+                const saved = await uploadRes.json();
+                setStatus('Extracting text...');
+                const extractRes = await fetch(`/api/documents/${saved.id}/extract-text`, { method: 'POST' });
+                if (!extractRes.ok) {
+                    throw new Error('Text extraction failed');
+                }
+                setStatus('Done! Redirecting...');
+                setTimeout(onDone, 800);
+            } catch (err) {
+                console.error(err);
+                setStatus('Something went wrong. Please try again.');
+            } finally {
+                setBusy(false);
+            }
+        };
+
+        return (
+            React.createElement('div', { className: 'card flex-col' },
+                React.createElement('h2', null, 'Upload a PDF'),
+                React.createElement('form', { onSubmit: handleSubmit, className: 'flex-col' },
+                    React.createElement('input', {
+                        type: 'file',
+                        accept: 'application/pdf',
+                        onChange: (e) => setFile(e.target.files[0] || null)
+                    }),
+                    React.createElement('div', { className: 'flex', style: { gap: '0.75rem' } },
+                        React.createElement('button', { type: 'submit', disabled: busy }, busy ? 'Working...' : 'Upload & Extract'),
+                        React.createElement('button', { type: 'button', className: 'secondary', onClick: onDone }, 'Back')
+                    ),
+                    status && React.createElement('p', { className: 'status' }, status)
+                )
+            )
+        );
+    }
+
+    function DocumentDetailPage({ document, onBack }) {
+        const [rawText, setRawText] = useState('');
+        const [textError, setTextError] = useState('');
+        const [summary, setSummary] = useState('');
+        const [summaryLoading, setSummaryLoading] = useState(false);
+        const [question, setQuestion] = useState('');
+        const [qaAnswer, setQaAnswer] = useState('');
+        const [qaLoading, setQaLoading] = useState(false);
+
+        useEffect(() => {
+            setRawText('');
+            setSummary('');
+            setQaAnswer('');
+            setTextError('');
+            fetch(`/api/documents/${document.id}/text`)
+                .then((res) => {
+                    if (!res.ok) throw new Error();
+                    return res.json();
+                })
+                .then((payload) => setRawText(payload.rawText || ''))
+                .catch(() => setTextError('Text not available yet. Make sure extraction succeeded.'));
+
+            fetch(`/api/documents/${document.id}/summary`)
+                .then((res) => res.ok ? res.json() : null)
+                .then((data) => {
+                    if (data && data.summaryText) {
+                        setSummary(data.summaryText);
+                    }
+                })
+                .catch(() => {});
+        }, [document.id]);
+
+        const handleSummarize = async () => {
+            setSummaryLoading(true);
+            try {
+                const res = await fetch(`/api/documents/${document.id}/summarize`, { method: 'POST' });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                setSummary(data.summaryText);
+            } catch (err) {
+                alert('Failed to summarize document.');
+            } finally {
+                setSummaryLoading(false);
+            }
+        };
+
+        const handleAskQuestion = async () => {
+            if (!question.trim()) {
+                return;
+            }
+            setQaLoading(true);
+            try {
+                const res = await fetch(`/api/documents/${document.id}/qa`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                setQaAnswer(data.answer);
+            } catch (err) {
+                alert('Unable to answer question right now.');
+            } finally {
+                setQaLoading(false);
+            }
+        };
+
+        return (
+            React.createElement('div', { className: 'flex-col' },
+                React.createElement('button', { className: 'secondary', onClick: onBack }, '← Back to documents'),
+                React.createElement('div', { className: 'card flex-col' },
+                    React.createElement('h2', null, document.originalFileName || 'Document'),
+                    React.createElement('p', { style: { color: '#9ca3af' } }, `Uploaded: ${formatDate(document.uploadedAt)} | Status: ${document.status}`),
+                    textError
+                        ? React.createElement('p', { style: { color: '#f87171' } }, textError)
+                        : React.createElement('textarea', {
+                            value: rawText,
+                            rows: 10,
+                            readOnly: true
+                        })
+                ),
+                React.createElement('div', { className: 'card flex-col' },
+                    React.createElement('div', { className: 'flex', style: { justifyContent: 'space-between', alignItems: 'center' } },
+                        React.createElement('h3', null, 'Summary'),
+                        React.createElement('button', { onClick: handleSummarize, disabled: summaryLoading }, summaryLoading ? 'Summarizing…' : 'Summarize')
+                    ),
+                    summary
+                        ? React.createElement('pre', { style: { whiteSpace: 'pre-wrap', fontFamily: 'inherit' } }, summary)
+                        : React.createElement('p', { style: { color: '#9ca3af' } }, 'No summary yet. Click "Summarize" to generate one.')
+                ),
+                React.createElement('div', { className: 'card flex-col' },
+                    React.createElement('h3', null, 'Ask a question'),
+                    React.createElement('input', {
+                        type: 'text',
+                        placeholder: 'What is the notice period?',
+                        value: question,
+                        onChange: (e) => setQuestion(e.target.value)
+                    }),
+                    React.createElement('div', { className: 'flex', style: { gap: '0.75rem' } },
+                        React.createElement('button', { onClick: handleAskQuestion, disabled: qaLoading }, qaLoading ? 'Asking…' : 'Ask'),
+                        qaAnswer && React.createElement('span', { style: { color: '#a5b4fc' } }, 'Answer below')
+                    ),
+                    qaAnswer && React.createElement('pre', { style: { whiteSpace: 'pre-wrap', fontFamily: 'inherit' } }, qaAnswer)
+                )
+            )
+        );
+    }
+
+    function SearchPage() {
+        const [query, setQuery] = useState('');
+        const [results, setResults] = useState([]);
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+
+        const handleSearch = async (e) => {
+            e.preventDefault();
+            if (!query.trim()) return;
+            setLoading(true);
+            setError('');
+            try {
+                const res = await fetch(`/api/documents/search?query=${encodeURIComponent(query)}`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                setResults(data);
+            } catch (err) {
+                setError('Search failed. Try again.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        return (
+            React.createElement('div', { className: 'flex-col' },
+                React.createElement('form', { className: 'card flex', onSubmit: handleSearch },
+                    React.createElement('input', {
+                        type: 'text',
+                        placeholder: 'Search keywords (e.g., notice, invoice, IELTS)…',
+                        value: query,
+                        onChange: (e) => setQuery(e.target.value)
+                    }),
+                    React.createElement('button', { type: 'submit' }, loading ? 'Searching…' : 'Search')
+                ),
+                error && React.createElement('p', { style: { color: '#f87171' } }, error),
+                React.createElement('div', { className: 'flex-col' },
+                    results.map(result => React.createElement('div', { key: result.documentId, className: 'card' },
+                        React.createElement('h4', null, result.originalFileName || `Document #${result.documentId}`),
+                        React.createElement('p', { className: 'snippet' }, result.snippet || 'No snippet available.')
+                    ))
+                )
+            )
+        );
+    }
+
+    function App() {
+        const [page, setPage] = useState('documents');
+        const [selectedDocument, setSelectedDocument] = useState(null);
+        const [refreshKey, setRefreshKey] = useState(0);
+
+        const goHome = () => {
+            setSelectedDocument(null);
+            setPage('documents');
+            setRefreshKey((n) => n + 1);
+        };
+
+        return (
+            React.createElement('div', { className: 'app' },
+                React.createElement('header', null,
+                    React.createElement('div', null,
+                        React.createElement('h1', null, 'Document AI Hub'),
+                        React.createElement('p', { style: { color: '#9ca3af', marginTop: '0.2rem' } }, 'Summaries • Search • Q&A')
+                    ),
+                    React.createElement('nav', null,
+                        React.createElement('button', { className: page === 'documents' ? '' : 'secondary', onClick: () => { setPage('documents'); setSelectedDocument(null); } }, 'Documents'),
+                        React.createElement('button', { className: page === 'upload' ? '' : 'secondary', onClick: () => setPage('upload') }, 'Upload'),
+                        React.createElement('button', { className: page === 'search' ? '' : 'secondary', onClick: () => setPage('search') }, 'Search')
+                    )
+                ),
+                page === 'documents' && React.createElement(DocumentsPage, {
+                    onView: (doc) => { setSelectedDocument(doc); setPage('detail'); },
+                    onUpload: () => setPage('upload'),
+                    refreshKey
+                }),
+                page === 'upload' && React.createElement(UploadPage, { onDone: goHome }),
+                page === 'detail' && selectedDocument && React.createElement(DocumentDetailPage, {
+                    document: selectedDocument,
+                    onBack: goHome
+                }),
+                page === 'search' && React.createElement(SearchPage, null)
+            )
+        );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+</script>
+</body>
+</html>
