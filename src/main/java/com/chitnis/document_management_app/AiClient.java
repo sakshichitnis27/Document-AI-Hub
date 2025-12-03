@@ -27,7 +27,7 @@ public class AiClient {
     private final String model;
 
     public AiClient(
-            @Value("${groq.api.key}") String apiKey,
+            @Value("${groq.api.key:}") String apiKey,
             @Value("${groq.api.base-url:https://api.groq.com/openai/v1}") String baseUrl,
             @Value("${groq.api.model:llama-3.1-8b-instant}") String model
     ) {
