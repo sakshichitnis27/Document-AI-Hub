@@ -62,6 +62,7 @@ public class DocumentService {
         doc.setSizeInBytes(file.getSize());
         doc.setUploadedAt(Instant.now());
         doc.setStatus(DocumentStatus.UPLOADED);
+        doc.setWorkspaceId(1L); // Default workspace
 
         return documentRepository.save(doc);
     }

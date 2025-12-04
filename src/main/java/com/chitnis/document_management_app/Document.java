@@ -29,6 +29,9 @@ public class Document {
     @Column(columnDefinition = "LONGTEXT")
     private String rawText;
 
+    @Column(name = "workspace_id")
+    private Long workspaceId;
+
     public Long getId() {
         return id;
     }
@@ -91,5 +94,13 @@ public class Document {
 
     public void setRawText(String rawText) {
         this.rawText = rawText;
+    }
+
+    public Long getWorkspaceId() {
+        return workspaceId;
+    }
+
+    public void setWorkspaceId(Long workspaceId) {
+        this.workspaceId = workspaceId;
     }
 }
