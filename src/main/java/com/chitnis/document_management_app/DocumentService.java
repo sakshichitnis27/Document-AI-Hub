@@ -6,6 +6,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -22,13 +23,22 @@ import java.util.UUID;
 public class DocumentService {
 
     private final DocumentRepository documentRepository;
+    private final DocumentChunkRepository documentChunkRepository;
+    private final EmbeddingService embeddingService;
 
     // value from application.properties
     @Value("${app.upload-dir}")
     private String uploadDir;
 
-    public DocumentService(DocumentRepository documentRepository) {
+    @Value("${app.chunk-size:800}")
+    private int chunkSize;
+
+    public DocumentService(DocumentRepository documentRepository,
+                           DocumentChunkRepository documentChunkRepository,
+                           EmbeddingService embeddingService) {
         this.documentRepository = documentRepository;
+        this.documentChunkRepository = documentChunkRepository;
+        this.embeddingService = embeddingService;
     }
 
     public Document uploadDocument(MultipartFile file) throws IOException {
@@ -99,8 +109,70 @@ public class DocumentService {
             String text = stripper.getText(pdfDocument);
             document.setRawText(text);
             document.setStatus(DocumentStatus.TEXT_EXTRACTED);
-            return documentRepository.save(document);
+            Document saved = documentRepository.save(document);
+
+            // Try to create embeddings, but don't fail if it errors
+            try {
+                createEmbeddings(saved.getId());
+            } catch (Exception e) {
+                // Log error but don't fail the extraction
+                System.err.println("Warning: Failed to create embeddings: " + e.getMessage());
+            }
+
+            return saved;
         }
+    }
+
+    /**
+     * Create embeddings for a document by chunking the text and embedding each chunk.
+     */
+    @Transactional
+    public void createEmbeddings(Long documentId) {
+        Document document = findDocument(documentId);
+        if (document.getRawText() == null || document.getRawText().isBlank()) {
+            throw new IllegalStateException("Text has not been extracted for document " + documentId);
+        }
+        createEmbeddingsInternal(document);
+    }
+
+    private void createEmbeddingsInternal(Document document) {
+        String text = document.getRawText();
+        if (text == null || text.isBlank()) {
+            return;
+        }
+
+        // Delete existing chunks if any
+        documentChunkRepository.deleteByDocumentId(document.getId());
+
+        // Split text into chunks
+        List<String> chunks = VectorUtils.splitIntoChunks(text, chunkSize);
+
+        // Create embeddings for each chunk
+        int index = 0;
+        for (String chunkText : chunks) {
+            if (chunkText.isBlank()) {
+                continue;
+            }
+
+            // Get embedding vector
+            List<Double> embedding = embeddingService.embed(chunkText);
+
+            // Convert to JSON
+            String embeddingJson = VectorUtils.vectorToJson(embedding);
+
+            // Save chunk
+            DocumentChunk chunk = new DocumentChunk(
+                    document.getId(),
+                    index++,
+                    chunkText,
+                    embeddingJson
+            );
+            documentChunkRepository.save(chunk);
+        }
+    }
+
+    public long getChunkCount(Long documentId) {
+        return documentChunkRepository.countByDocumentId(documentId);
     }
 
     public String getDocumentText(Long documentId) {

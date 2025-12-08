@@ -148,6 +148,36 @@ public class DocumentController {
         }
     }
 
+    @PostMapping("/{id}/embeddings")
+    public ResponseEntity<?> createEmbeddings(@PathVariable("id") Long documentId) {
+        try {
+            documentService.createEmbeddings(documentId);
+            long chunkCount = documentService.getChunkCount(documentId);
+            return ResponseEntity.ok(Map.of(
+                    "documentId", documentId,
+                    "chunkCount", chunkCount,
+                    "message", "Embeddings created successfully"
+            ));
+        } catch (Exception ex) {
+            ex.printStackTrace(); // Print full stack trace to console
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", ex.getMessage(), "type", ex.getClass().getName()));
+        }
+    }
+
+    @GetMapping("/{id}/chunks")
+    public ResponseEntity<?> getChunkInfo(@PathVariable("id") Long documentId) {
+        try {
+            long chunkCount = documentService.getChunkCount(documentId);
+            return ResponseEntity.ok(Map.of(
+                    "documentId", documentId,
+                    "chunkCount", chunkCount
+            ));
+        } catch (EntityNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        }
+    }
+
     private DocumentResponse toResponse(Document document) {
         return new DocumentResponse(
                 document.getId(),
