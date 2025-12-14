@@ -5,6 +5,8 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -73,12 +75,14 @@ public class DocumentService {
         doc.setUploadedAt(Instant.now());
         doc.setStatus(DocumentStatus.UPLOADED);
         doc.setWorkspaceId(1L); // Default workspace
+        doc.setUserId(getCurrentUserId()); // Associate with current user
 
         return documentRepository.save(doc);
     }
 
     public List<Document> getAllDocuments() {
-        return documentRepository.findAll();
+        Long userId = getCurrentUserId();
+        return documentRepository.findByUserId(userId);
     }
 
     public List<DocumentSearchResult> searchDocuments(String query) {
@@ -86,7 +90,8 @@ public class DocumentService {
             throw new IllegalArgumentException("Search query must not be empty.");
         }
 
-        List<Document> matches = documentRepository.searchByRawText(query);
+        Long userId = getCurrentUserId();
+        List<Document> matches = documentRepository.searchByRawText(userId, query);
         return matches.stream()
                 .map(doc -> new DocumentSearchResult(
                         doc.getId(),
@@ -184,8 +189,25 @@ public class DocumentService {
     }
 
     private Document findDocument(Long documentId) {
-        return documentRepository.findById(documentId)
+        Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new EntityNotFoundException("Document not found: " + documentId));
+
+        // Verify that the document belongs to the current user
+        Long currentUserId = getCurrentUserId();
+        if (!document.getUserId().equals(currentUserId)) {
+            throw new EntityNotFoundException("Document not found: " + documentId);
+        }
+
+        return document;
+    }
+
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User is not authenticated");
+        }
+        User user = (User) authentication.getPrincipal();
+        return user.getId();
     }
 
     private void validateFile(MultipartFile file) {
