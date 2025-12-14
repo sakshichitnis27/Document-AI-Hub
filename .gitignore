@@ -34,3 +34,21 @@ build/
 
 # Local environment variables
 .env
+
+# Uploaded documents (don't commit user files)
+uploads/
+*.pdf
+
+# Database migration scripts (after initial setup)
+migration.sql
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# Application specific
+update-imports.sh
