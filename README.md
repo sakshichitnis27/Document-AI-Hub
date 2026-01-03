@@ -558,9 +558,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Sakshi Chitnis**
 
-- LinkedIn: [Your LinkedIn Profile](#)
-- GitHub: [@yourusername](#)
-- Email: your.email@example.com
+- LinkedIn: [https://www.linkedin.com/in/sakshi-chitnis-0333881ab/
+](#)
+- GitHub: [@sakshichitnis27](#)
+- Email: sakshi.chitnis23@gmail.com
 
 ---
 
