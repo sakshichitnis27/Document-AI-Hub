@@ -82,6 +82,35 @@
             font-size: 0.8rem;
         }
 
+        input[type="checkbox"] {
+            width: 1.2rem;
+            height: 1.2rem;
+            cursor: pointer;
+        }
+
+        .multi-doc-section {
+            background: #1a1f2e;
+            border: 2px solid #2563eb;
+            border-radius: 0.8rem;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .selected-docs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .doc-tag {
+            background: rgba(37, 99, 235, 0.25);
+            padding: 0.3rem 0.8rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(37, 99, 235, 0.5);
+        }
+
         .card {
             background: #0b0f1a;
             border: 1px solid rgba(255, 255, 255, 0.05);
@@ -228,6 +257,11 @@
         const [documents, setDocuments] = useState([]);
         const [loading, setLoading] = useState(true);
         const [error, setError] = useState('');
+        const [selectedDocIds, setSelectedDocIds] = useState([]);
+        const [multiQuestion, setMultiQuestion] = useState('');
+        const [multiAnswer, setMultiAnswer] = useState('');
+        const [multiDocNames, setMultiDocNames] = useState([]);
+        const [multiQaLoading, setMultiQaLoading] = useState(false);
 
         useEffect(() => {
             let mounted = true;
@@ -240,6 +274,36 @@
             return () => { mounted = false; };
         }, [refreshKey]);
 
+        const handleCheckboxChange = (docId) => {
+            setSelectedDocIds((prev) =>
+                prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+            );
+        };
+
+        const handleMultiDocQuestion = async () => {
+            if (!multiQuestion.trim() || selectedDocIds.length === 0) return;
+            setMultiQaLoading(true);
+            setMultiAnswer('');
+            setMultiDocNames([]);
+            try {
+                const res = await authFetch('/api/documents/qa/multi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ documentIds: selectedDocIds, question: multiQuestion })
+                });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                setMultiAnswer(data.answer);
+                setMultiDocNames(data.documentNames || []);
+            } catch (err) {
+                alert('Unable to answer question right now.');
+            } finally {
+                setMultiQaLoading(false);
+            }
+        };
+
+        const selectedDocs = documents.filter((doc) => selectedDocIds.includes(doc.id));
+
         return React.createElement('div', null,
             React.createElement('div', { className: 'card flex', style: { justifyContent: 'space-between', alignItems: 'center' } },
                 React.createElement('div', null,
@@ -248,12 +312,47 @@
                 ),
                 React.createElement('button', { onClick: onUpload }, 'Upload new')
             ),
+            selectedDocIds.length > 0 && React.createElement('div', { className: 'multi-doc-section' },
+                React.createElement('h3', null, 'Multi-Document Q&A'),
+                React.createElement('p', { style: { color: '#a5b4fc', fontSize: '0.9rem' } },
+                    `${selectedDocIds.length} document${selectedDocIds.length > 1 ? 's' : ''} selected`
+                ),
+                React.createElement('div', { className: 'selected-docs' },
+                    selectedDocs.map((doc) =>
+                        React.createElement('span', { key: doc.id, className: 'doc-tag' }, doc.originalFileName || 'Untitled')
+                    )
+                ),
+                React.createElement('input', {
+                    type: 'text',
+                    placeholder: 'Compare salaries mentioned in these documents...',
+                    value: multiQuestion,
+                    onChange: (e) => setMultiQuestion(e.target.value),
+                    style: { marginTop: '1rem' }
+                }),
+                React.createElement('div', { className: 'flex', style: { gap: '0.75rem', marginTop: '0.75rem' } },
+                    React.createElement('button', { onClick: handleMultiDocQuestion, disabled: multiQaLoading },
+                        multiQaLoading ? 'Asking…' : 'Ask Across All Selected'
+                    ),
+                    React.createElement('button', {
+                        className: 'secondary',
+                        onClick: () => setSelectedDocIds([])
+                    }, 'Clear Selection')
+                ),
+                multiAnswer && React.createElement('div', { style: { marginTop: '1rem' } },
+                    React.createElement('h4', null, 'Answer:'),
+                    React.createElement('pre', { style: { whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: '#05060a', padding: '1rem', borderRadius: '0.5rem' } }, multiAnswer),
+                    multiDocNames.length > 0 && React.createElement('p', { style: { fontSize: '0.85rem', color: '#9ca3af', marginTop: '0.5rem' } },
+                        `Sources: ${multiDocNames.join(', ')}`
+                    )
+                )
+            ),
             loading && React.createElement('p', null, 'Loading documents...'),
             error && React.createElement('p', { style: { color: '#f87171' } }, error),
             (!loading && documents.length === 0) && React.createElement('p', null, 'No documents uploaded yet.'),
             documents.length > 0 && React.createElement('table', null,
                 React.createElement('thead', null,
                     React.createElement('tr', null,
+                        React.createElement('th', null, 'Select'),
                         React.createElement('th', null, 'Name'),
                         React.createElement('th', null, 'Uploaded'),
                         React.createElement('th', null, 'Status'),
@@ -262,6 +361,13 @@
                 ),
                 React.createElement('tbody', null,
                     documents.map((doc) => React.createElement('tr', { key: doc.id },
+                        React.createElement('td', null,
+                            React.createElement('input', {
+                                type: 'checkbox',
+                                checked: selectedDocIds.includes(doc.id),
+                                onChange: () => handleCheckboxChange(doc.id)
+                            })
+                        ),
                         React.createElement('td', null, doc.originalFileName || 'Untitled'),
                         React.createElement('td', null, formatDate(doc.uploadedAt)),
                         React.createElement('td', null, React.createElement('span', { className: 'pill' }, doc.status)),

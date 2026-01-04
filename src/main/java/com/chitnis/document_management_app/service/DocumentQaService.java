@@ -2,6 +2,7 @@ package com.chitnis.document_management_app.service;
 import com.chitnis.document_management_app.ai.AiClient;
 import com.chitnis.document_management_app.util.VectorUtils;
 import com.chitnis.document_management_app.dto.DocumentQaResponse;
+import com.chitnis.document_management_app.dto.MultiDocumentQaResponse;
 import com.chitnis.document_management_app.repository.DocumentChunkRepository;
 import com.chitnis.document_management_app.repository.DocumentRepository;
 import com.chitnis.document_management_app.entity.DocumentChunk;
@@ -10,7 +11,9 @@ import com.chitnis.document_management_app.entity.Document;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class DocumentQaService {
@@ -149,5 +152,44 @@ public class DocumentQaService {
             snippet = snippet + "…";
         }
         return snippet;
+    }
+
+    public MultiDocumentQaResponse answerQuestionMulti(List<Long> documentIds, String question) {
+        if (question == null || question.isBlank()) {
+            throw new IllegalArgumentException("Question must not be empty.");
+        }
+
+        if (documentIds == null || documentIds.isEmpty()) {
+            throw new IllegalArgumentException("At least one document ID must be provided.");
+        }
+
+        // Fetch all documents
+        List<Document> documents = new ArrayList<>();
+        for (Long docId : documentIds) {
+            Document doc = documentRepository.findById(docId)
+                    .orElseThrow(() -> new EntityNotFoundException("Document not found: " + docId));
+
+            if (doc.getRawText() == null || doc.getRawText().isBlank()) {
+                throw new IllegalStateException("Text has not been extracted for document " + docId);
+            }
+            documents.add(doc);
+        }
+
+        // Collect document texts and names
+        List<String> documentTexts = documents.stream()
+                .map(Document::getRawText)
+                .collect(Collectors.toList());
+
+        List<String> documentNames = documents.stream()
+                .map(doc -> doc.getOriginalFileName() != null ? doc.getOriginalFileName() : "Document #" + doc.getId())
+                .collect(Collectors.toList());
+
+        // Call AI with all document texts
+        String answer = aiClient.answerQuestionMulti(documentTexts, question);
+
+        // Build a combined snippet from the first document (or could be enhanced to show snippets from all)
+        String snippet = buildSnippet(documents.get(0).getRawText(), question);
+
+        return new MultiDocumentQaResponse(documentIds, documentNames, question, answer, snippet);
     }
 }

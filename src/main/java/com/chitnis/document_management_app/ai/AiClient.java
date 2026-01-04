@@ -124,10 +124,10 @@ public class AiClient {
                 * Answer exclusively with facts stated in the document.
                 * Quote or reference the specific detail that supports the answer.
                 * If the document does not contain the information, reply exactly with: "The document does not mention this."
-                
+
                 Document:
                 %s
-                
+
                 Question: %s
                 Provide a concise answer plus a short supporting quote.
                 """.formatted(truncated, question);
@@ -170,6 +170,89 @@ public class AiClient {
                 || response.choices.get(0).message == null
                 || response.choices.get(0).message.content == null) {
             log.warn("Empty AI response received for Q&A.");
+            return "AI did not return an answer.";
+        }
+
+        return response.choices.get(0).message.content.trim();
+    }
+
+    public String answerQuestionMulti(List<String> documentTexts, String question) {
+        if (question == null || question.isBlank()) {
+            throw new IllegalArgumentException("Question must not be empty.");
+        }
+
+        if (documentTexts == null || documentTexts.isEmpty()) {
+            throw new IllegalArgumentException("At least one document text must be provided.");
+        }
+
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("⚠️  Groq API key not configured. AI Q&A unavailable.");
+            return "AI Q&A is currently unavailable. Please configure the Groq API key to enable this feature. Get a free key at: https://console.groq.com";
+        }
+
+        // Combine all document texts with separators
+        String combinedContext = String.join("\n\n---DOCUMENT SEPARATOR---\n\n", documentTexts);
+
+        // Truncate to fit model context
+        String truncated = combinedContext.length() > 10000 ? combinedContext.substring(0, 10000) : combinedContext;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        String userPrompt = """
+                You are given multiple documents and a question.
+                * Answer exclusively with facts stated in the documents.
+                * Compare and synthesize information from all provided documents.
+                * Quote or reference specific details from the documents that support the answer.
+                * If comparing, clearly mention which document contains which information.
+                * If the documents do not contain the information, reply exactly with: "The documents do not mention this."
+
+                Documents:
+                %s
+
+                Question: %s
+                Provide a concise answer that synthesizes information from all relevant documents, with supporting quotes.
+                """.formatted(truncated, question);
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "temperature", 0.1,
+                "messages", List.of(
+                        Map.of("role", "system", "content", "You are a careful analyst that answers strictly from the provided documents and can compare and synthesize information across them."),
+                        Map.of("role", "user", "content", userPrompt)
+                )
+        );
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        ChatCompletionResponse response;
+        try {
+            response = restTemplate.postForObject(
+                    baseUrl + "/chat/completions",
+                    request,
+                    ChatCompletionResponse.class
+            );
+        } catch (RestClientResponseException ex) {
+            String message = "AI provider error (" + ex.getRawStatusCode() + "): " + ex.getResponseBodyAsString();
+            log.error("❌ Groq API call failed with status {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getRawStatusCode() == 401 || ex.getRawStatusCode() == 403 || ex.getRawStatusCode() == 429) {
+                log.error("❌ Authentication/Quota issue detected. Please check:");
+                log.error("   1. Your API key is valid and not expired");
+                log.error("   2. Your Groq account has billing enabled");
+                log.error("   3. You haven't exceeded your quota");
+                return "AI temporarily unavailable. Unable to answer the question.";
+            }
+            throw new IllegalStateException(message, ex);
+        } catch (RestClientException ex) {
+            log.error("❌ Failed to connect to Groq API: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
+            log.error("   Full error: ", ex);
+            return "AI temporarily unavailable. Unable to answer the question.";
+        }
+
+        if (response == null || response.choices == null || response.choices.isEmpty()
+                || response.choices.get(0).message == null
+                || response.choices.get(0).message.content == null) {
+            log.warn("Empty AI response received for multi-document Q&A.");
             return "AI did not return an answer.";
         }
 

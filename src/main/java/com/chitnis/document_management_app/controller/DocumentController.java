@@ -8,6 +8,8 @@ import com.chitnis.document_management_app.dto.DocumentSearchResult;
 import com.chitnis.document_management_app.dto.DocumentQaResponse;
 import com.chitnis.document_management_app.dto.DocumentQaRequest;
 import com.chitnis.document_management_app.dto.DocumentResponse;
+import com.chitnis.document_management_app.dto.MultiDocumentQaRequest;
+import com.chitnis.document_management_app.dto.MultiDocumentQaResponse;
 
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -146,6 +148,27 @@ public class DocumentController {
             DocumentQaResponse response = documentQaService.answerQuestion(documentId, request.getQuestion());
             return ResponseEntity.ok(Map.of(
                     "documentId", response.getDocumentId(),
+                    "question", response.getQuestion(),
+                    "answer", response.getAnswer(),
+                    "sourceSnippet", response.getSourceSnippet()
+            ));
+        } catch (EntityNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/qa/multi")
+    public ResponseEntity<?> answerQuestionMulti(@Valid @RequestBody MultiDocumentQaRequest request) {
+        try {
+            MultiDocumentQaResponse response = documentQaService.answerQuestionMulti(
+                    request.getDocumentIds(),
+                    request.getQuestion()
+            );
+            return ResponseEntity.ok(Map.of(
+                    "documentIds", response.getDocumentIds(),
+                    "documentNames", response.getDocumentNames(),
                     "question", response.getQuestion(),
                     "answer", response.getAnswer(),
                     "sourceSnippet", response.getSourceSnippet()
