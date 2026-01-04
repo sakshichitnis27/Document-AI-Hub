@@ -48,11 +48,12 @@ public class AiClient {
     }
 
     public String summarize(String text) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("Groq API key is not configured.");
-        }
-
         String truncated = text.length() > 4000 ? text.substring(0, 4000) : text;
+
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("⚠️  Groq API key not configured. Using fallback summary.");
+            return fallbackSummary(truncated);
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -103,11 +104,13 @@ public class AiClient {
     }
 
     public String answerQuestion(String text, String question) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("Groq API key is not configured.");
-        }
         if (question == null || question.isBlank()) {
             throw new IllegalArgumentException("Question must not be empty.");
+        }
+
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("⚠️  Groq API key not configured. AI Q&A unavailable.");
+            return "AI Q&A is currently unavailable. Please configure the Groq API key to enable this feature. Get a free key at: https://console.groq.com";
         }
 
         String truncated = text.length() > 6000 ? text.substring(0, 6000) : text;
