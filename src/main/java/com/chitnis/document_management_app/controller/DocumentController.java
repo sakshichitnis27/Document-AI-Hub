@@ -12,7 +12,11 @@ import com.chitnis.document_management_app.dto.MultiDocumentQaRequest;
 import com.chitnis.document_management_app.dto.MultiDocumentQaResponse;
 
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -207,6 +212,32 @@ public class DocumentController {
             ));
         } catch (EntityNotFoundException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<Resource> downloadDocument(@PathVariable("id") Long documentId) {
+        try {
+            Path filePath = documentService.getDocumentFile(documentId);
+            Document document = documentService.getDocumentById(documentId);
+
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (!resource.exists() || !resource.isReadable()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+
+            String contentType = document.getMimeType() != null ? document.getMimeType() : "application/pdf";
+            String filename = document.getOriginalFileName() != null ? document.getOriginalFileName() : "document.pdf";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                    .body(resource);
+        } catch (EntityNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

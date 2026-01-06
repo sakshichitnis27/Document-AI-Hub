@@ -196,6 +196,19 @@ public class DocumentService {
         return document.getRawText();
     }
 
+    public Path getDocumentFile(Long documentId) {
+        Document document = findDocument(documentId);
+        Path filePath = Paths.get(document.getStoredFilePath());
+        if (!Files.exists(filePath)) {
+            throw new IllegalStateException("Stored file is missing on disk for document " + documentId);
+        }
+        return filePath;
+    }
+
+    public Document getDocumentById(Long documentId) {
+        return findDocument(documentId);
+    }
+
     private Document findDocument(Long documentId) {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new EntityNotFoundException("Document not found: " + documentId));

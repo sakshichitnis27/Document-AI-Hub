@@ -499,11 +499,35 @@
             }
         };
 
+        const handleViewOriginal = async () => {
+            try {
+                const response = await authFetch(`/api/documents/${document.id}/download`);
+                if (!response.ok) {
+                    alert('Failed to load PDF. Please try again.');
+                    return;
+                }
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                window.open(url, '_blank');
+
+                // Clean up the blob URL after a delay
+                setTimeout(() => window.URL.revokeObjectURL(url), 100);
+            } catch (err) {
+                console.error('Error opening PDF:', err);
+                alert('Failed to open PDF. Please try again.');
+            }
+        };
+
         return React.createElement('div', { className: 'flex-col' },
             React.createElement('button', { className: 'secondary', onClick: onBack }, '← Back to documents'),
             React.createElement('div', { className: 'card flex-col' },
-                React.createElement('h2', null, document.originalFileName || 'Document'),
-                React.createElement('p', { style: { color: '#9ca3af', margin: 0 } }, `Uploaded: ${formatDate(document.uploadedAt)} | Status: ${document.status}`),
+                React.createElement('div', { className: 'flex', style: { justifyContent: 'space-between', alignItems: 'center' } },
+                    React.createElement('div', null,
+                        React.createElement('h2', null, document.originalFileName || 'Document'),
+                        React.createElement('p', { style: { color: '#9ca3af', margin: 0 } }, `Uploaded: ${formatDate(document.uploadedAt)} | Status: ${document.status}`)
+                    ),
+                    React.createElement('button', { onClick: handleViewOriginal }, '📄 View Original PDF')
+                ),
                 textError
                     ? React.createElement('p', { style: { color: '#f87171' } }, textError)
                     : React.createElement('textarea', { value: rawText, rows: 10, readOnly: true })
