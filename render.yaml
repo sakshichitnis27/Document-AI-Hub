@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: document-ai-hub
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
