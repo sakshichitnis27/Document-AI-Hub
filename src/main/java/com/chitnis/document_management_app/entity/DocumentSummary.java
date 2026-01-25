@@ -16,8 +16,7 @@ public class DocumentSummary {
     @JoinColumn(name = "document_id")
     private Document document;
 
-    @Lob
-    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String summaryText;
 
     @Column(nullable = false)

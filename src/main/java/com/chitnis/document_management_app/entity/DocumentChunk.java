@@ -19,11 +19,10 @@ public class DocumentChunk {
     @Column(name = "chunk_index", nullable = false)
     private Integer chunkIndex;
 
-    @Lob
     @Column(columnDefinition = "TEXT", nullable = false)
     private String text;
 
-    @Column(columnDefinition = "JSON", nullable = false)
+    @Column(columnDefinition = "JSONB", nullable = false)
     private String embedding;
 
     @Column(name = "created_at")

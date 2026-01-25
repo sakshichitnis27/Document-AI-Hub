@@ -25,8 +25,7 @@ public class Document {
     @Enumerated(EnumType.STRING)
     private DocumentStatus status;
 
-    @Lob
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String rawText;
 
     @Column(name = "workspace_id")
